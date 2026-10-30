@@ -1,0 +1,73 @@
+:root {
+  --bg: #fbfaf7;
+  --fg: #1d1c1a;
+  --muted: #6b675f;
+  --rule: #e4e0d8;
+  --link: #8a3b12;
+  --code-bg: #f1eee8;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161514;
+    --fg: #e8e5df;
+    --muted: #9b968c;
+    --rule: #2e2c29;
+    --link: #e39a6d;
+    --code-bg: #232120;
+  }
+  img { background: #fff; border-radius: 3px; }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: Charter, "Bitstream Charter", "Iowan Old Style", "Sitka Text", Cambria, Georgia, serif;
+  font-size: 18px;
+  line-height: 1.6;
+}
+main { max-width: 42rem; margin: 0 auto; padding: 3rem 16px 5rem; }
+
+a { color: var(--link); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { text-decoration-thickness: 2px; }
+
+h1, h2, h3, h4 { line-height: 1.25; font-weight: 600; }
+h1 { font-size: 2rem; margin: 0 0 0.5rem; letter-spacing: -0.01em; }
+h2 { font-size: 1.35rem; margin: 2.5rem 0 0.75rem; }
+h3 { font-size: 1.1rem; margin: 2rem 0 0.5rem; }
+h2 strong, h3 strong { font-weight: inherit; }
+
+nav { font-size: 0.95rem; margin-bottom: 2.5rem; }
+nav a { color: var(--muted); text-decoration: none; }
+nav a:hover { color: var(--link); }
+
+.meta, .lede + .links, .date, .venue { color: var(--muted); }
+.meta { font-size: 0.95rem; margin: 0 0 2.5rem; }
+.lede { font-size: 1.1rem; margin: 0.75rem 0; }
+.links { font-size: 0.95rem; }
+
+header { padding-bottom: 1.5rem; border-bottom: 1px solid var(--rule); }
+
+ul.posts, ul.papers { list-style: none; padding: 0; margin: 0; }
+ul.posts li, ul.papers li {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.25rem 1rem;
+  padding: 0.6rem 0; border-bottom: 1px solid var(--rule);
+}
+ul.papers li { flex-direction: column; }
+.date, .venue { font-size: 0.9rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.venue { white-space: normal; }
+
+article img { display: block; max-width: 100%; height: auto; margin: 1.5rem auto 0.5rem; }
+article table { border-collapse: collapse; margin: 1.5rem 0; font-size: 0.95rem; display: block; overflow-x: auto; }
+article th, article td { border: 1px solid var(--rule); padding: 0.35rem 0.6rem; text-align: left; }
+article pre { background: var(--code-bg); padding: 0.9rem 1rem; overflow-x: auto; border-radius: 4px; font-size: 0.85rem; line-height: 1.45; }
+article code { font-size: 0.88em; }
+article blockquote { margin: 1.5rem 0; padding-left: 1rem; border-left: 3px solid var(--rule); color: var(--muted); }
+.katex { font-size: 1.05em; }
+.katex-display { overflow-x: auto; overflow-y: hidden; }
+.footnote { font-size: 0.9rem; color: var(--muted); margin-top: 3rem; }
+.footnote hr { border: 0; border-top: 1px solid var(--rule); }
+article iframe.widget { display: block; width: 100%; aspect-ratio: 680 / 600; border: 1px solid var(--rule); border-radius: 4px; margin: 1.5rem 0; background: #fff; }
+ul.posts li .desc { flex-basis: 100%; font-size: 0.92rem; color: var(--muted); line-height: 1.45; }

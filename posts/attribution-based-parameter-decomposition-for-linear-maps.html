@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Attribution-based parameter decomposition for linear maps · Alex Gibson</title>
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body,{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false})"></script>
+</head>
+<body>
+<main>
+<nav><a href="../index.html">Alex Gibson</a></nav>
+<article>
+<h1>Attribution-based parameter decomposition for linear maps</h1>
+<p class="meta">20 June 2025</p>
+<p><strong>TLDR:</strong> The simplicity loss currently used in APD (<a href="https://arxiv.org/abs/2501.14926">Braun et al., 2025</a>) is not scale invariant. By modifying this loss so that it is, APD seems to behave better in some circumstances. Also, for numerical stability, implementations of APD should add \(\epsilon\) when computing the Schatten p-norm for \(p \in (0,1)\), because the gradient of \(x^p\) blows up near \(x = 0\).</p>
+<h2>Setup</h2>
+<p>The setup is that we have some input distribution \(x \in \mathbb{R}^{M}\) and a linear map \(W \in \mathbb{R}^{D \times M}\) , and we perform APD with respect to the output \(Wx\). </p>
+<p>We take \(x\) to be a normalised gaussian (i.e uniform on the sphere), for simplicity. In addition, we take \(W\) to be the identity matrix. We also take \(M=D = 100\).</p>
+<p>APD initializes \(C\) components, which are each formed as the sum of pairwise outer products of a set of \(r\) vectors \(U_i\) and \(V_i\). This outer product is used so that we can compute the simplicity loss efficiently later.</p>
+<p>The first step of APD is to calculate gradient attribution scores for each of our \(C\) components with respect to an input \(x\).</p>
+<p>We have \(A_c(x) = \sqrt{\frac{\sum_{o=1}^{D} (\sum_{i,j} \frac{\mathrm{d}\sum_{k=1}^{M} W_{ok}x_k}{\mathrm{d}W_{ij}}P^{C}_{ij})^{2}}{D}} = \sqrt{\frac{\sum_{o=1}^{D} \sum_{j} ( x_{j}^2{P^2_{c,oj})}}{D}} = \sqrt{\frac{\sum_{o=1}^{D} (x^2)^T P^2_{c,o:}}{D}}\)</p>
+<p>We select the top-k components with the highest attribution scores, and then perform a second forward pass on this sparse subset of components, training for reconstruction loss, and training for low-rank active components.</p>
+<p>Let \(K\) be the sum of the top-k components, and \(L\) be the sum of all the components. Then the reconstruction loss is \(||Wx-Kx||_2\) and the faithfulness loss is \(\sum_{i,j} (W_{ij}-L_{ij})^2\)</p>
+<p>Simplicity loss drives for low rank, penalizing the \(l_p\)-norm (technically a quasi-norm) of the spectra of active components for \(p \in (0,1)\), making the spectra sparse (because we have a lower bound on the Frobenius norm of useful active components, so can't just drive the spectrum to \(0\)).</p>
+<h2>Behaviour of APD</h2>
+<p>In practice, faithfulness loss goes to very close to \(0\) quite quickly, and so we can restrict to just changing the hyperparameters of simplicity and minimality loss. I looked at  \(\alpha \cdot{} \text{loss}_{minimality} +\text{loss}_{faithful} + \text{loss}_{simplicity}\) as the loss function for varying values of \(\alpha\). </p>
+<h3>Small \(\alpha\)</h3>
+<p>For small values of \(\alpha\), the model learns components of the form \(\frac{\text{W}}{C}\), effectively spreading out \(W\) across all \(C\) components. But this means that we only get a sparse reconstruction \(K\) of \(\frac{kW}{C}\), leading to a high minimality loss when \(k &lt;&lt; C\).</p>
+<p>Our simplicity loss is low even though the components we learn are not low rank. The assertion I made earlier that penalizing the \(l_p\)-norm will lead to a sparse spectrum assumed a large lower bound on the Frobenius norm of the active components, stopping us from driving the spectrum to \(0\). But we only have this when our sparse reconstruction is reasonably accurate, i.e: our minimality loss is reasonably low.</p>
+<p>This is disappointing because it means that we get dull behaviour. As soon as the model loses minimality loss it no longer needs to worry about the simplicity loss, because it can drive the spectrum to \(0\), and it will just learn high-rank components:</p>
+<p><img loading="lazy" alt="" src="../images/c9ae485d0f0ef314.png" /></p>
+<p>A typical active component for low values of \(\alpha\)</p>
+<p><img loading="lazy" alt="" src="../images/be7bdf64ddbdcc5c.png" /></p>
+<p>\(K\) (the sum of the active components) for small values of \(\alpha\)</p>
+<h3>Large \(\alpha\)</h3>
+<p><img loading="lazy" alt="" src="../images/d92ca87dde9abbc6.png" /></p>
+<p>A typical active component for large values of \(\alpha\)</p>
+<p><img loading="lazy" alt="" src="../images/5582f22181b44e48.png" /></p>
+<p>\(K\) (the sum of the active components) for large values of \(\alpha\)</p>
+<p>This time we get good sparse reconstruction, so low minimality loss. Our simplicity loss is high because the active components we learn are all high rank. In fact, in this case the model seems to consistently use the same active components,  meaning we can just straightforwardly combine these components. So it seems like in this case APD was a success!</p>
+<h2>Modified simplicity loss</h2>
+<p>The small \(\alpha\) regime is boring because APD just learns to drive the spectrum to \(0\), meaning that it has no incentive to learn low-rank matrices. Instead, we can normalize the \(l_p\) norm by the frobenius norm (the \(l_2\) norm of the singular values), and use this for simplicity loss. </p>
+<p>In particular, the usual simplicity loss is given by \(\sum_{i=1}^{k} ||P_{c_i}||^p_p\) where \(c_i\) are the active components. Instead we can use \(\sum_{i=1}^{k} (\frac{||P_{c_i}||^p_p}{||P_{c_i}||^{p}_2} - 1)\), which we can compute efficiently using the same trick as for the Schatten p-norm.</p>
+<p>Note that we have  \(||P_{c_i}||_2 \le ||P_{c_i}||_p\) , with equality in the rank-1 case (when all but \(1\) singular value is \(0\)), so that our loss is non-negative, and \(0\) precisely when \(P_c\) is rank-1. This modified simplicity loss is invariant under scaling any individual component, so that APD can no longer cheat by making components smaller.</p>
+<p>Note that in practice, for a single component, this should end up being basically the same as minimizing the WSNM () loss discussed in <a href="https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&amp;arnumber=7539605,">Weighted Schatten p-Norm Minimization for Image Denoising and Background Subtraction,</a> because when \(||X-Y||_F\) is small, we can approximate \(||X||_F\) by \(||Y||_F\), so that our modified simplified loss differs from the loss proposed there only up to multiplicative factor \(||Y||_F^p\) which we can absorb into \(\lambda\) (and a constant shift, but this is irrelevant for minimization). Though this is an informal argument, and there could be theoretical differences that I am unaware of, that make the WSNM loss superior even in the multi-component case. For instance, the modified loss is not convex, though this doesn't seem to cause problems in practice.</p>
+<h3>Numerical instability</h3>
+<p>Note that for \(p \in (0,1)\), the derivative of \(x^p\) is \(px^{p-1}\), where \(p-1 &lt; 0\). Therefore gradients are badly behaved near 0. We can fix this just by adding \(\epsilon\) appropriately when computing the Schatten p-norm.</p>
+<h3>Modified small \(\alpha\) regime</h3>
+<p><img loading="lazy" alt="" src="../images/672045df7c37acc8.png" /></p>
+<p>A typical active component for low values of \(\alpha\) with modified simplicity loss</p>
+<p><img loading="lazy" alt="" src="../images/a33144bac703bef7.png" /></p>
+<p>\(K\) (the sum of the active components) for small values of \(\alpha\)</p>
+<p>All the active components are now visibly low rank, and yet they still sum to approximate a rough diagonal, though the minimality loss is high.</p>
+<h2>Conclusion</h2>
+<p>Studying APD for linear maps can help us improve our intuition for how it will behave for larger models. Here we used a spherically symmetric input, but it would be interesting to look at how APD behaves for non-homogeneous inputs.</p>
+<p>While it seems like the modified simplicity loss seems to behave nicer for high minimality loss, I am not sure that it has the exact same theoretical behaviour as the previous simplicity loss, and I am most likely missing something. I am not suggesting replacing the simplicity loss with the modified version, just that it is interesting to see the differences that arise between the two losses.</p>
+<h3>Code to reproduce results</h3>
+<p>https://colab.research.google.com/drive/1sBPytrtZNfBMpVYeaiAgwj7Kqle7qgeg?usp=sharing</p>
+</article>
+</main>
+</body>
+</html>

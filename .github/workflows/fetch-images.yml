@@ -1,0 +1,41 @@
+name: Copy post images into the repo
+
+# Downloads any images the posts still load from external sites into images/
+# and rewrites the pages to use the local copies. Runs when posts change,
+# and can be started by hand from the Actions tab.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "posts/**"
+      - "fetch_images.py"
+      - ".github/workflows/fetch-images.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download images and rewrite pages
+        run: python3 fetch_images.py
+
+      - name: Commit changes
+        run: |
+          git add images posts
+          if git diff --cached --quiet; then
+            echo "No external images left; nothing to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Copy post images into the repo"
+            git push
+          fi

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Using the probabilistic method to bound the performance of toy transformers · Alex Gibson</title>
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body,{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false})"></script>
+</head>
+<body>
+<main>
+<nav><a href="../index.html">Alex Gibson</a></nav>
+<article>
+<h1>Using the probabilistic method to bound the performance of toy transformers</h1>
+<p class="meta">6 November 2025</p>
+<h2>Introduction</h2>
+<p>Transformers are statistical artefacts. If a model achieves 99% accuracy, it might have learnt an algorithm that relies upon some property of the input data that only holds 99% of the time.</p>
+<p>Let's say that our train input to the transformer is 100 independent unbiased coin tosses. Then the transformer might implicitly rely upon there being between 35 and 65 heads, because there is a ~ 0.17% chance that there would be a more extreme number of heads.</p>
+<p>This potentially makes transformers vulnerable to adversarial inputs. But it also tells us how we should be approaching formal proofs. We should not necessarily expect transformers to learn algorithms that work on every input, but instead for them to learn algorithms which work on the "typical set" of inputs, like "the set of inputs with between 35 and 65 heads". </p>
+<p>Then we can bound transformer performance in two stages:</p>
+<p>1.) Identify a "typical set" of inputs, where we can show the transformer gets high accuracy</p>
+<p>2.) Bound the volume of this "typical set" using probabilistic techniques.</p>
+<h2>Max-of-k transformer</h2>
+<p>To demonstrate this approach, I derive bounds on the performance of a toy one-layer attention-only model, the max-of-k transformer. This transformer takes as input \(n_{\text{ctx}}\) numbers between \(1\) and \(63\), and is trained to output the maximum number in the sequence. It is a single layer transformer with a single attention head, and has no layer norm or MLP layer.</p>
+<p>Intuitively, the way the transformer solves this task is by using its QK circuit to attend more to tokens the bigger they are, and then using its OV circuit to copy the tokens it attends to. So it will attend the most to the biggest token, and then copy this token the most, so that it outputs the maximum token as its highest logit.</p>
+<p>But there are adversarial inputs where toy transformers trained on this task fail. For instance, take the sequence \(62,62,62,62,....,62,63\). A sequence this extreme is super unlikely to appear in the training data, so the model won't be prepared to handle it. Even though the QK circuit attends slightly more to an individual \(63\) token than \(62\), the huge number of \(62\)'s in a single input sequence can overwhelm the transformer and lead it to erroneously outputting \(62\) rather than \(63\).</p>
+<p>We'd like a condition on the input sequence, which measures how "extreme" it is, which is simple enough that we can use probabilistic techniques to estimate how many "extreme sequences" there are. </p>
+<p>For max-of-k, we can get a pretty simple condition by working through the algebra.</p>
+<h2>Equation for logits</h2>
+<p>Let's say we have an input sequence of tokens between \(0\) and \(63\), say \(x_1,x_2,...,x_{n_\text{ctx}}\).</p>
+<p>Then let \(A_i\) be the exponentiated attention score at \(x_i\).</p>
+<p>The output from the single attention head is \(\sum_{i=1}^{n_{\text{ctx}}} \frac{A_i}{\sum_{j=1}^{n_{\text{ctx}}} A_j} (EVO[x_i]+PVO[i])\).</p>
+<p>This accounts for the EVO circuit and the PVO circuit. But we also have the direct circuit due to E and P, which we can bring inside the sum, so that our output logit at token k is:</p>
+<p>\(\text{logit}_{k} = \sum_{i=1}^{n_{\text{ctx}}} \frac{A_i}{\sum_{j=1}^{n_{\text{ctx}}} A_j} (EVOU[x_i,k]+PVOU[i,k]+EU[x_i,k]+PU[i,k])\)</p>
+<p>We are only interested in the relative sizes of logits, so we can cancel out the softmax denominator, and just look at</p>
+<p>\(\text{out}_{k} = \sum_{i=1}^{n_{\text{ctx}}} A_i(EVOU[x_i,k]+PVOU[i,k]+EU[x_i,k]+PU[i,k])\).</p>
+<p>Write \(\text{eu}_{x_i,k}\) for \(\text{EVOU}[x_i,k]+ \text{EU}[x_i,k]\) and \(\text{pu}_{i,k}\) for \(\text{PVOU}[i,k]+\text{PU}[i,k]\).</p>
+<h2>Hyperplane form</h2>
+<p>If we restrict to sequences whose maximum is M, then we are interested in finding conditions on having \(\text{out}_{M} \ge \text{out}_{k}\) for all \(k\) between \(0\) and \(63\).</p>
+<p>\(\text{out}_M \ge \text{out}_k \leftrightarrow \sum_{i=1}^{n_{\text{ctx}}} A_i(\text{eu}_{x_i,M} - \text{eu}_{x_i,k} +\text{pu}_{i,M}-\text{pu}_{i,k}) \ge 0\)</p>
+<p>Now \(A_i = e^{\frac{EQKE[x_{n_{\text{ctx}}},x_i] + EQKP[x_{n_{\text{ctx}}},i] + PQKP[n_{\text{ctx}},i] + PQKE[n_{\text{ctx}},x_i]]}{\sqrt{d_{\text{head}}}}} = e_{x_{n_{\text{ctx}}},x_i}p_{x_{n_{\text{ctx}}},i}\)</p>
+<p>Now we fix \(x_{n_{ctx}}\) as well as fixing M.</p>
+<p>Then \(\text{out}_{M} \ge \text{out}_{k} \leftrightarrow \sum_{i=1}^{n_{\text{ctx}}} e_{x_i}p_{i}(\text{eu}_{x_i,M}+\text{pu}_{i,M})\ge \sum_{i=1}^{n_{\text{ctx}}} e_{x_i}p_{i}(\text{eu}_{x_i,k}+\text{pu}_{i,k})\).</p>
+<p>Now bound \(|\text{pu}_{i,M}-\text{pu}_{i,k}| \le C\). Then \(\text{out}_{M} &lt; \text{out}_{k}\) implies:\(0 &lt;  \sum_{i=1}^{n_{\text{ctx}}} e_{x_i}p_{i}(\text{eu}_{x_i,k}-\text{eu}_{x_i,M}+C)\)</p>
+<p>Finally this is in a form we can work with, because the right hand side is just the set of sequences which lie above a certain hyperplane in sequence space.</p>
+<h2>Chernoff bounds</h2>
+<p>It's in general quite hard to determine precisely the size of discrete sets which lie above hyperplanes, but we can bound their size from above using <a href="https://en.wikipedia.org/wiki/Chernoff_bound">Chernoff bounds</a>.</p>
+<p>Let \(f_{x_i,k,M,x_{n_{\text{ctx}}}} = e_{x_i}(\text{eu}_{x_i,k} - \text{eu}_{x_i,M} + C)\)</p>
+<p>Then for arbitrary \(\lambda\), we have:</p>
+<p>\(P(\text{out}_{M} &lt; \text{out}_{k}) \le P(0 &lt; \sum_{i=1}^{n_{\text{ctx}}} p_{i}f_{x_i,k,M,x_{n_{\text{ctx}}}}) = P(1 &lt; e^{\lambda\sum_{i=1}^{n_{\text{ctx}}} p_{i}f_{x_i,k,M,x_{n_{\text{ctx}}}}})\)</p>
+<p>\(P(1 &lt; e^{\lambda\sum_{i=1}^{n_{\text{ctx}}} p_{i}f_{x_i,k,M,x_{n_{\text{ctx}}}}}) \le \mathbb{E}[e^{\lambda \sum_{i=1}^{n_{\text{ctx}}} p_{i}f_{x_i,k,M,x_{n_{\text{ctx}}}}}] = \prod_{i=1}^{n_{\text{ctx}}} \mathbb{E}[e^{\lambda p_{i}f_{x_i,k,M,x_{n_{\text{ctx}}}}}]\).</p>
+<p>Where the last equality comes from independence of \(x_1\),\(x_2\),..,\(x_{n_{ctx}}\). Although technically because we fixed \(M\) we don't strictly have independence, but we can fix this with some bookkeeping by partitioning sequences by the positions which have \(M\)'s in.</p>
+<p>There is no closed form for optimal \(\lambda\), but we can use gradient descent to obtain a good numerical value for \(\lambda\).</p>
+<p>We can sum across different values of \(x_{n_{\text{ctx}}}\) to get a probability just in terms of \(M\) and \(k\).</p>
+<h2>Full bounds</h2>
+<p>Now we have \(P(\text{logit}_{M} \ge \text{logit}_{k} \text{ for all }k \in [0,63]) = 1 - P(\text{logit}_{M} &lt; \text{logit}_{k} \text{ for some } k \in [0,63])\)</p>
+<p>And \(P(\text{logit}_{M} &lt; \text{logit}_{k} \text{ for some } k \in [0,63]) \le \sum_{k=0}^{63} B_{k,M}\), where \(B_{k,M}\) is our chernoff bound from before, and we have used a union bound.</p>
+<p>We should expect the union bound to work well, because there will tend to only be one \(k\) which has a greater logit than \(M\), if there exists such a \(k\). So we get a lower bound on \(P(\text{logit}_{M} \ge \text{logit}_{k} \text{ for all }k \in [0,63])\).</p>
+<p>Then we have:</p>
+<p>\(P(\text{Correct max logit} ) = \sum_{M=0}^{63} P(M \text{ max token})P(\text{Correct max logit} | M \text{  max token})\),</p>
+<p>and we can get a lower bound on this.</p>
+<h2>When to use probabilistic bound</h2>
+<p>This bound works best for longer sequences, because for shorter sequences it's easier to manually enumerate the sequences which lie above the hyperplane. The probabilistic method easily adapts to longer sequences, where manually enumerating sequences quickly becomes unfeasible.</p>
+</article>
+</main>
+</body>
+</html>

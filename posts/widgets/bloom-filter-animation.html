@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bloom filter forward pass animation</title>
+<style>html,body{margin:0;background:#fff;color:#1d1c1a}</style>
+</head>
+<body>
+<div style="padding: 1rem 0; font-family: sans-serif;">
+
+<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 1.5rem; flex-wrap: wrap;">
+  <button id="play-btn" style="min-width: 88px; padding: 6px 14px; border: 0.5px solid rgba(0,0,0,0.3); background: transparent; border-radius: 8px; cursor: pointer;">Play</button>
+  <button id="reset-btn" style="padding: 6px 14px; border: 0.5px solid rgba(0,0,0,0.3); background: transparent; border-radius: 8px; cursor: pointer;">Resample</button>
+  <span style="flex: 1; min-width: 80px;"></span>
+  <span style="font-size: 13px; color: #666;">Stage:</span>
+  <span id="stage-label" style="font-size: 13px; font-weight: 500; min-width: 200px;">Ready</span>
+</div>
+
+<svg id="bf-canvas" viewBox="0 0 680 510" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto; display: block;" role="img">
+  <title>Bloom filter forward pass animation</title>
+  <desc>Animated forward pass with d_vocab=200, d_hidden=64, k=4, hash size d=8.</desc>
+
+  <g id="row-vocab-in" transform="translate(20, 20)">
+    <text x="0" y="-6" style="font-size: 11px; fill: #666;">Input tokens (200 total, 4 active)</text>
+    <g id="vocab-in-cells"></g>
+  </g>
+
+  <g id="row-residual-in" transform="translate(20, 110)">
+    <text x="0" y="-6" style="font-size: 11px; fill: #666;">Residual stream (64 dims) — sum of token hashes</text>
+    <g id="residual-in-cells"></g>
+  </g>
+
+  <g id="row-mlp" transform="translate(20, 180)">
+    <text x="0" y="-6" style="font-size: 11px; fill: #666;">After MLP — indicator of union of hashes</text>
+    <g id="mlp-cells"></g>
+  </g>
+
+  <g id="row-vocab-out" transform="translate(20, 270)">
+    <text x="0" y="-6" style="font-size: 11px; fill: #666;">Output logits — overlap |S_j ∩ ∪S_(n_i)| for each of 200 tokens</text>
+    <g id="vocab-out-bars"></g>
+  </g>
+
+  <g id="fp-readout" transform="translate(20, 430)">
+    <text id="fp-text" x="0" y="0" style="font-size: 12px; font-weight: 500;"></text>
+  </g>
+
+  <g id="legend" transform="translate(20, 470)">
+    <rect x="0" y="0" width="10" height="10" fill="#7F77DD" rx="2"/>
+    <text x="16" y="9" style="font-size: 11px; fill: #666;">top-k token / on-bit</text>
+    <rect x="160" y="0" width="10" height="10" fill="#D3D1C7" rx="2"/>
+    <text x="176" y="9" style="font-size: 11px; fill: #666;">other token / off-bit</text>
+    <rect x="320" y="0" width="10" height="10" fill="#1D9E75" rx="2"/>
+    <text x="336" y="9" style="font-size: 11px; fill: #666;">winning logit</text>
+    <rect x="450" y="0" width="10" height="10" fill="#D85A30" rx="2"/>
+    <text x="466" y="9" style="font-size: 11px; fill: #666;">false positive</text>
+  </g>
+</svg>
+
+<div id="commentary" style="margin-top: 1rem; min-height: 56px; font-size: 14px; color: #666; line-height: 1.5;">
+  Press play. d_vocab=200, d_hidden=64, k=4, hash size d=8. False-positive probability per non-top-k token is approximately (kd/d_hidden)^d which is about 0.4%. Across 196 tokens, expect 0–1 false positives per pass.
+</div>
+
+<script>
+(function(){
+  var D_VOCAB = 200;
+  var D_HIDDEN = 64;
+  var K = 4;
+  var HASH_SIZE = 8;
+  var VOCAB_CELL_W = 3;
+  var VOCAB_CELL_H = 16;
+  var HIDDEN_CELL_W = 8;
+  var HIDDEN_CELL_H = 22;
+
+  var hashes = [];
+  var topK = [];
+  var alphas = [];
+  var stage = 0;
+  var playing = false;
+  var timer = null;
+
+  var stages = [
+    "Ready",
+    "1. Sample top-k tokens",
+    "2. Each token hashes into 8 of 64 dims",
+    "3. Residual stream = weighted union",
+    "4. MLP collapses magnitudes to indicator",
+    "5. Unembedding scores all 200 tokens",
+    "6. Top-k win, false positives stand out"
+  ];
+
+  var commentary = [
+    "Press play. d_vocab=200, d_hidden=64, k=4, hash size d=8. False-positive probability per non-top-k token is about 0.4%. Across 196 tokens, expect 0-1 false positives per pass.",
+    "4 of 200 tokens are 'active' with weights alpha. The network's job: read the residual stream and assign mass to exactly these 4.",
+    "Each token has a hash S_i, a fixed random 8-element subset of [64]. The input is alpha_i v_(n_i) summed over the 4 active tokens.",
+    "After summing, dimensions hit by multiple top-k tokens are brighter. But for the read-off we want, only support matters - magnitudes are about to be discarded.",
+    "ReLU(x + b) with negative bias, then subtract via mlp_out=-I, then add residual back. Result: every dim in the union = |b|, every dim outside = 0. The alpha magnitudes are gone.",
+    "Each token j gets logit |S_j intersect union|. Top-k tokens score d=8 (full overlap). Non-top-k tokens score less, unless their hash happens to be entirely covered.",
+    "Top-k tokens win with logit 8. Non-top-k tokens scoring 8 are Bloom filter false positives. Resample to see how often this happens - about 0.4% per token."
+  ];
+
+  function sampleHashes() {
+    hashes = [];
+    for (var i = 0; i < D_VOCAB; i++) {
+      var idxs = [];
+      var pool = [];
+      for (var j = 0; j < D_HIDDEN; j++) pool.push(j);
+      for (var s = 0; s < HASH_SIZE; s++) {
+        var r = Math.floor(Math.random() * pool.length);
+        idxs.push(pool[r]);
+        pool.splice(r, 1);
+      }
+      idxs.sort(function(a,b){return a-b;});
+      hashes.push(idxs);
+    }
+    var pool2 = [];
+    for (var i2 = 0; i2 < D_VOCAB; i2++) pool2.push(i2);
+    topK = [];
+    for (var s2 = 0; s2 < K; s2++) {
+      var r2 = Math.floor(Math.random() * pool2.length);
+      topK.push(pool2[r2]);
+      pool2.splice(r2, 1);
+    }
+    topK.sort(function(a,b){return a-b;});
+    alphas = topK.map(function(){ return 0.5 + Math.random() * 2.5; });
+  }
+
+  function setStageLabel() {
+    document.getElementById("stage-label").textContent = stages[stage] || "";
+    document.getElementById("commentary").textContent = commentary[stage] || "";
+  }
+
+  function render() {
+    renderVocabIn();
+    renderResidualIn();
+    renderMLP();
+    renderVocabOut();
+    renderFpReadout();
+  }
+
+  function renderVocabIn() {
+    var g = document.getElementById("vocab-in-cells");
+    g.innerHTML = "";
+    var totalW = D_VOCAB * VOCAB_CELL_W;
+    var offsetX = (640 - totalW) / 2;
+    for (var i = 0; i < D_VOCAB; i++) {
+      var isTop = topK.indexOf(i) >= 0;
+      var fill = (stage >= 1 && isTop) ? "#7F77DD" : "#D3D1C7";
+      var x = offsetX + i * VOCAB_CELL_W;
+      var r = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      r.setAttribute("x", x);
+      r.setAttribute("y", 0);
+      r.setAttribute("width", VOCAB_CELL_W - 0.5);
+      r.setAttribute("height", VOCAB_CELL_H);
+      r.setAttribute("rx", 1);
+      r.setAttribute("fill", fill);
+      g.appendChild(r);
+    }
+    if (stage >= 1) {
+      for (var s = 0; s < K; s++) {
+        var ii = topK[s];
+        var xx = offsetX + ii * VOCAB_CELL_W + VOCAB_CELL_W / 2;
+        var t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        t.setAttribute("x", xx);
+        t.setAttribute("y", VOCAB_CELL_H + 14);
+        t.setAttribute("text-anchor", "middle");
+        t.setAttribute("style", "font-size: 9px; fill: #666;");
+        t.textContent = "a=" + alphas[s].toFixed(1);
+        g.appendChild(t);
+      }
+    }
+  }
+
+  function residualValues() {
+    var v = [];
+    for (var j = 0; j < D_HIDDEN; j++) v.push(0);
+    if (stage < 2) return v;
+    for (var s = 0; s < K; s++) {
+      var tok = topK[s];
+      var a = alphas[s];
+      var h = hashes[tok];
+      for (var hi = 0; hi < h.length; hi++) v[h[hi]] += a;
+    }
+    return v;
+  }
+
+  function renderResidualIn() {
+    var g = document.getElementById("residual-in-cells");
+    g.innerHTML = "";
+    var v = residualValues();
+    var max = 0.001;
+    for (var k = 0; k < v.length; k++) if (v[k] > max) max = v[k];
+    var totalW = D_HIDDEN * HIDDEN_CELL_W;
+    var offsetX = (640 - totalW) / 2;
+    for (var j = 0; j < D_HIDDEN; j++) {
+      var x = offsetX + j * HIDDEN_CELL_W;
+      var fill = "#F1EFE8";
+      if (stage >= 2 && v[j] > 0) {
+        var intensity = v[j] / max;
+        if (intensity > 0.66) fill = "#534AB7";
+        else if (intensity > 0.33) fill = "#7F77DD";
+        else fill = "#AFA9EC";
+      }
+      var r = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      r.setAttribute("x", x);
+      r.setAttribute("y", 0);
+      r.setAttribute("width", HIDDEN_CELL_W - 1.5);
+      r.setAttribute("height", HIDDEN_CELL_H);
+      r.setAttribute("rx", 2);
+      r.setAttribute("fill", fill);
+      g.appendChild(r);
+    }
+  }
+
+  function unionMask() {
+    var u = [];
+    for (var j = 0; j < D_HIDDEN; j++) u.push(0);
+    for (var s = 0; s < K; s++) {
+      var h = hashes[topK[s]];
+      for (var hi = 0; hi < h.length; hi++) u[h[hi]] = 1;
+    }
+    return u;
+  }
+
+  function renderMLP() {
+    var g = document.getElementById("mlp-cells");
+    g.innerHTML = "";
+    var totalW = D_HIDDEN * HIDDEN_CELL_W;
+    var offsetX = (640 - totalW) / 2;
+    var u = unionMask();
+    for (var j = 0; j < D_HIDDEN; j++) {
+      var x = offsetX + j * HIDDEN_CELL_W;
+      var fill = "#F1EFE8";
+      if (stage >= 4) fill = u[j] ? "#534AB7" : "#F1EFE8";
+      else if (stage === 3) fill = u[j] ? "#AFA9EC" : "#F1EFE8";
+      var r = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      r.setAttribute("x", x);
+      r.setAttribute("y", 0);
+      r.setAttribute("width", HIDDEN_CELL_W - 1.5);
+      r.setAttribute("height", HIDDEN_CELL_H);
+      r.setAttribute("rx", 2);
+      r.setAttribute("fill", fill);
+      g.appendChild(r);
+    }
+  }
+
+  function logits() {
+    var u = unionMask();
+    var out = [];
+    for (var i = 0; i < D_VOCAB; i++) {
+      var dot = 0;
+      var h = hashes[i];
+      for (var hi = 0; hi < h.length; hi++) if (u[h[hi]]) dot += 1;
+      out.push(dot);
+    }
+    return out;
+  }
+
+  function countFalsePositives() {
+    var logs = logits();
+    var count = 0;
+    for (var i = 0; i < D_VOCAB; i++) {
+      if (topK.indexOf(i) < 0 && logs[i] === HASH_SIZE) count++;
+    }
+    return count;
+  }
+
+  function renderVocabOut() {
+    var g = document.getElementById("vocab-out-bars");
+    g.innerHTML = "";
+    var totalW = D_VOCAB * VOCAB_CELL_W;
+    var offsetX = (640 - totalW) / 2;
+    var maxBarH = 130;
+    var logs = (stage >= 5) ? logits() : (function(){ var a=[]; for(var i=0;i<D_VOCAB;i++) a.push(0); return a; })();
+    var maxL = HASH_SIZE;
+
+    for (var i = 0; i < D_VOCAB; i++) {
+      var x = offsetX + i * VOCAB_CELL_W;
+      var isTop = topK.indexOf(i) >= 0;
+      var h = (logs[i] / maxL) * maxBarH;
+      var fill = "#D3D1C7";
+      if (stage >= 6) {
+        if (logs[i] === maxL) fill = isTop ? "#1D9E75" : "#D85A30";
+        else if (logs[i] >= maxL - 1) fill = "#9FE1CB";
+        else if (logs[i] > 0) fill = "#E1F5EE";
+        else fill = "#F1EFE8";
+      } else if (stage === 5) {
+        if (isTop) fill = "#7F77DD";
+        else if (logs[i] > 0) fill = "#AFA9EC";
+        else fill = "#F1EFE8";
+      }
+      var baseY = maxBarH;
+      var r = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      r.setAttribute("x", x);
+      r.setAttribute("y", baseY - h);
+      r.setAttribute("width", VOCAB_CELL_W - 0.3);
+      r.setAttribute("height", Math.max(1, h));
+      r.setAttribute("fill", fill);
+      g.appendChild(r);
+    }
+
+    var baseline = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    baseline.setAttribute("x", offsetX);
+    baseline.setAttribute("y", maxBarH);
+    baseline.setAttribute("width", totalW);
+    baseline.setAttribute("height", 1);
+    baseline.setAttribute("fill", "#D3D1C7");
+    g.appendChild(baseline);
+  }
+
+  function renderFpReadout() {
+    var t = document.getElementById("fp-text");
+    if (stage < 6) { t.textContent = ""; return; }
+    var fp = countFalsePositives();
+    if (fp === 0) {
+      t.setAttribute("fill", "#0F6E56");
+      t.textContent = "Clean pass: 0 false positives.";
+    } else {
+      t.setAttribute("fill", "#993C1D");
+      t.textContent = fp + " false positive" + (fp === 1 ? "" : "s") + " on this pass.";
+    }
+  }
+
+  function step() {
+    stage = Math.min(stage + 1, stages.length - 1);
+    setStageLabel();
+    render();
+    if (stage >= stages.length - 1) {
+      playing = false;
+      document.getElementById("play-btn").textContent = "Replay";
+      clearInterval(timer);
+    }
+  }
+
+  function play() {
+    if (stage >= stages.length - 1) { stage = 0; render(); }
+    playing = true;
+    document.getElementById("play-btn").textContent = "Pause";
+    timer = setInterval(function(){ if (!playing) { clearInterval(timer); return; } step(); }, 1700);
+  }
+
+  function pause() {
+    playing = false;
+    document.getElementById("play-btn").textContent = "Play";
+    clearInterval(timer);
+  }
+
+  function reset() {
+    pause();
+    sampleHashes();
+    stage = 0;
+    setStageLabel();
+    render();
+  }
+
+  document.getElementById("play-btn").addEventListener("click", function(){ if (playing) pause(); else play(); });
+  document.getElementById("reset-btn").addEventListener("click", reset);
+
+  sampleHashes();
+  setStageLabel();
+  render();
+})();
+</script>
+
+</div>
+
+</body>
+</html>

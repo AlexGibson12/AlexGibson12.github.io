@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ping pong computation in superposition · Alex Gibson</title>
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body,{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false})"></script>
+</head>
+<body>
+<main>
+<nav><a href="../index.html">Alex Gibson</a></nav>
+<article>
+<h1>Ping pong computation in superposition</h1>
+<p class="meta">29 December 2025</p>
+<h2>Overview</h2>
+<p>This post builds on <em>Circuits in Superposition 2</em>, using the same terminology.</p>
+<p>I focus on the \(z=1\) case, meaning that exactly one circuit is active on each forward pass. This restriction simplifies the setting substantially and allows a construction with <strong>zero error,</strong> with \(T = \frac{D^2}{d^2}\) <strong>,</strong> \(L+2\) layers, and width \(D(1+\frac{1}{d} + \frac{\lceil\text{log}_2{\frac{D}{d}}\rceil}{D})\). While the construction does not directly generalise to larger \(z\), the strategy for mitigating error should still be relevant. I think the ideas behind the construction could be useful for larger \(z\), and the construction itself is quite neat.</p>
+<h3>Ping-pong trick for \(z=1\)</h3>
+<p><img loading="lazy" alt="" src="../images/7df1717cf98a4244.png" /></p>
+<p>A circuit is specified by an ordered pair of memory blocks (the red squares). There are \(\frac{D}{d}\)memory blocks, so \(\frac{D^2}{d^2}\) circuits can be coded for. The circuit is computed by "bouncing" between these two memory blocks. White squares represent neurons with no activation, and black squares represent neurons with any amount of activation. Green-dashed arrows represent the bias specific to block \(i\). Here \(D=64\), \(d=16\).</p>
+<p>This is basically the same trick as <a href="https://embedded.fm/blog/2017/3/21/ping-pong-buffers">ping-pong buffers</a>.</p>
+<p>We divide the layer width \(D\) into \(\frac{D}{d}\) contiguous memory blocks of size \(d\).</p>
+<p>We start with an input consisting of a vector \(x \in \mathbb{R}^{d}\), together with one-hot encodings of a pair of memory blocks (\(i,j\)).</p>
+<p>We initially load the input \(x\) into memory block \(i\). </p>
+<p>Using a linear map applied to the one-hot encoding of memory block \(j\), we add a massive negative bias to all blocks in the next layer except memory block \(j\). This ensures that only memory block \(j\) can have neurons with non-zero activations in the following layer.</p>
+<p>Additionally, using a linear map applied to the one-hot encoding of \(i\), we can freely set a size \(d\) bias \(b^{1}_{(i,j)}\) for the next layer's block \(j\) as a function of \(i\) (see the green arrows in the figure above).</p>
+<p>We are also free to pick the \(d \times d\) linear map \(W^{1}_{(i,j)}\) between block \(i\) in the first layer and block \(j\) in the second layer.</p>
+<p>The end result is that when we run the network, all the blocks apart from block \(j\) in the second layer have \(0\) activation (because of the negative bias added by the one-hot encoding of \(j\)), while Block \(j\) has neuron activations corresponding to \(\text{ReLU}\)(\(W^{1}_{(i,j)}x\)\(+b^{1}_{(i,j)}\)). </p>
+<p>Now we perform the same trick in reverse, this time bouncing block \(j\) back to block \(i\). So that the third layer will have  \(\text{ReLU}(W^{2}_{(j,i)}\text{ReLU}(W^{1}_{(i,j)}x + b^{1}_{(i,j)}) + b^{2}_{(j,i)})\) in the \(i\)th block. </p>
+<p>We continue this process:</p>
+<p>Layer 1: \(i \to j\)</p>
+<p>Layer 2: \(j \to i\)</p>
+<p>Layer 3: \(i \to j\)</p>
+<p>\(\ldots\)</p>
+<p>Layer \(L\): (\(i \to j\)) or (\(j \to i\)) depending on parity</p>
+<p>Each transition between blocks we can freely specify a layer of a width \(d\) neural network.</p>
+<p>We transition \(L\) times, and require \(2\) layers to load and unload the inputs from the appropriate memory blocks, so we consume \(L+2\) layers total.</p>
+<h3>Binary encoding trick</h3>
+<p>We can optimize the above construction further by alternately swapping out the one-hot encoding of one of the blocks with a compressed \(\lceil {\text{log}_2(\frac{D}{d})} \rceil\) length binary encoding. </p>
+<p>On odd layers, we use a one-hot encoding for block \(i\), and a binary encoding for block \(j\).</p>
+<p>On even layers, block \(i\) uses a binary encoding, and block \(j\) uses a one-hot encoding.</p>
+<p>We can implement this swapping using an appropriately set bias and linear map between layers. </p>
+<p>The idea is that on layers where a block simply suppresses all but one block, we only need the binary encoding. A rank argument tells us that we can't naively compress the encoding of the block which provides the bias, however. </p>
+<h3>()Parameter counting argument</h3>
+<p>The above construction uses \(D(1+\frac{1}{d}+ \frac{\lceil \text{log}_2(\frac{D}{d}) \rceil}{D})\) width and \(L+2\) layers, to encode T = \(\frac{D^2}{d^2}\) circuits of width \(d\) and depth \(L\).</p>
+<p>Note that according to a naive parameter counting argument, assuming injectivity of the map from parameters of a neural network to behaviours, we should at most be able to fit in \(\frac{(L+2)(D^2(1+\frac{1}{d}+\frac{\lceil\text{log}_2{\frac{D}{d}} \rceil}{D})^2+D(1+\frac{1}{d}+\frac{\lceil \text{log}_2{\frac{D}{d} \rceil}}{D} ))}{L(d^2+d)}\)  circuits into such a network.</p>
+<p>So for large \(D\) the "theoretical" maximum number of circuits we can fit into the network tends to \(\frac{D^2}{d^2} \cdot \frac{L+2(1+\frac{1}{d})}{L}\) .</p>
+<p>So \(\frac{D^2}{d^2}\) is not bad, especially for large-ish \(d\) where we can pay off the cost of the one-hot encoding.</p>
+<h3>Optimizing the number of layers?</h3>
+<p>\(L+2\) layers seems hard to optimise down because the length \(d\) input to the first layer of the model interacts with the same \((d+1)D(1+\frac{1}{d}+\frac{\lceil\text{log}_2(\frac{D}{d})\rceil}{D})\) parameters on each forward pass, because the input is placed in the same initial position each time. The same is true for the final layer of the network where the output needs to be placed in a fixed final position. So the majority of the \(D^2(1+\frac{1}{d}+\frac{\lceil\text{log}_2(\frac{D}{d})\rceil}{D})^2+D(1+\frac{1}{d}+\frac{\lceil\text{log}_2{\frac{D}{d}}\rceil}{D})\) parameters on the first and final layers are wasted.</p>
+<p>I would be very interested in even impractical ways to get around this barrier. Tentatively I think this layer constraint is not just a quirk of the particular setup.</p>
+<h3>Testing</h3>
+<p>I have tested a <a href="https://blue-agnola-86.tiiny.site/">similar construction</a> up to \(T=16384, D = 1024, d = 8\), using this <a href="https://colab.research.google.com/drive/1jGHQ8z6pI_WcvSQ22Tozn-sfzEMhWCbe?usp=sharing">Google Colab</a> script. </p>
+<p>This was before I came up with the binary encoding trick, so it encodes \(16384\) randomly initialized circuits of width \(8\), given a \((1024+256)\) width network. With the binary encoding trick, it should be possible to get this down to a width of (\(1024+128+7\)).</p>
+<p>I have only tested one-layer networks, but since the output format matches the input format, this is sufficient to validate the construction.</p>
+<h3>Why focus on zero-error solutions?</h3>
+<p>I'm pretty skeptical of computation in superposition solutions that involve any noise in intermediate layers whatsoever. Because the Lipschitz constants of neural networks are terrible, and so the constant factors involved in the asymptotics suffer as well. I want to have concrete numbers, not just asymptotics, and they seem hard to obtain when allowing for noise in intermediate layers.<sup id="fnref:p18o6serum"><a class="footnote-ref" href="#fn:p18o6serum">1</a></sup> </p>
+<p>My way of avoiding having to think about Lipschitz/High-dimensional probability stuff is to work on finding solutions which work perfectly with probability \(p\), and otherwise fail catastrophically.</p>
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:p18o6serum">
+<p>[Although it'd be nice if there's a way to make use of Lipschitz-constrained neural networks here.]&#160;<a class="footnote-backref" href="#fnref:p18o6serum" title="Jump back to footnote 1 in the text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</article>
+</main>
+</body>
+</html>
