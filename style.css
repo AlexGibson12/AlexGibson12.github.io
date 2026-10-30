@@ -71,3 +71,16 @@ article blockquote { margin: 1.5rem 0; padding-left: 1rem; border-left: 3px soli
 .footnote hr { border: 0; border-top: 1px solid var(--rule); }
 article iframe.widget { display: block; width: 100%; aspect-ratio: 680 / 600; border: 1px solid var(--rule); border-radius: 4px; margin: 1.5rem 0; background: #fff; }
 ul.posts li .desc { flex-basis: 100%; font-size: 0.92rem; color: var(--muted); line-height: 1.45; }
+
+/* charts */
+figure.chart { margin: 1.75rem 0; }
+figure.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+figure.chart .bar.in { fill: var(--link); }
+figure.chart .bar.out { fill: var(--muted); opacity: 0.45; }
+figure.chart .bar:hover { opacity: 1; filter: brightness(1.15); }
+figure.chart .grid { stroke: var(--rule); stroke-width: 1; }
+figure.chart .axis { stroke: var(--muted); stroke-width: 1; }
+figure.chart .tick, figure.chart .axis-label { fill: var(--muted); font-size: 12px; font-family: inherit; }
+figure.chart .direct { fill: var(--fg); font-size: 13px; font-family: inherit; }
+figure.chart .bracket { fill: none; stroke: var(--fg); stroke-width: 1; }
+figure.chart figcaption, figure figcaption { font-size: 0.9rem; color: var(--muted); margin-top: 0.5rem; text-align: center; }

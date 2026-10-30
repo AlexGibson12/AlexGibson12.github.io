@@ -19,6 +19,90 @@
 <h2>Introduction</h2>
 <p>Transformers are statistical artefacts. If a model achieves 99% accuracy, it might have learnt an algorithm that relies upon some property of the input data that only holds 99% of the time.</p>
 <p>Let's say that our train input to the transformer is 100 independent unbiased coin tosses. Then the transformer might implicitly rely upon there being between 35 and 65 heads, because there is a ~ 0.17% chance that there would be a more extreme number of heads.</p>
+<figure class="chart">
+<svg viewBox="0 0 680 300" role="img" aria-labelledby="binom-title" xmlns="http://www.w3.org/2000/svg">
+<title id="binom-title">Distribution of the number of heads in 100 fair coin tosses; 35 to 65 heads highlighted</title>
+<line class="grid" x1="44" x2="668" y1="202.0" y2="202.0"/>
+<text class="tick" x="38" y="206.0" text-anchor="end">0.02</text>
+<line class="grid" x1="44" x2="668" y1="144.0" y2="144.0"/>
+<text class="tick" x="38" y="148.0" text-anchor="end">0.04</text>
+<line class="grid" x1="44" x2="668" y1="86.0" y2="86.0"/>
+<text class="tick" x="38" y="90.0" text-anchor="end">0.06</text>
+<line class="grid" x1="44" x2="668" y1="28.0" y2="28.0"/>
+<text class="tick" x="38" y="32.0" text-anchor="end">0.08</text>
+<path class="bar out" d="M45.00,260.00V260.00Q45.00,260.00 45.00,260.00H53.23Q53.23,260.00 53.23,260.00V260.00Z"><title>20 heads: 0.00%</title></path>
+<path class="bar out" d="M55.23,260.00V260.00Q55.23,260.00 55.23,260.00H63.46Q63.46,260.00 63.46,260.00V260.00Z"><title>21 heads: 0.00%</title></path>
+<path class="bar out" d="M65.46,260.00V260.00Q65.46,260.00 65.46,260.00H73.69Q73.69,260.00 73.69,260.00V260.00Z"><title>22 heads: 0.00%</title></path>
+<path class="bar out" d="M75.69,260.00V260.00Q75.69,260.00 75.69,260.00H83.92Q83.92,260.00 83.92,260.00V260.00Z"><title>23 heads: 0.00%</title></path>
+<path class="bar out" d="M85.92,260.00V260.00Q85.92,260.00 85.92,260.00H94.15Q94.15,260.00 94.15,260.00V260.00Z"><title>24 heads: 0.00%</title></path>
+<path class="bar out" d="M96.15,260.00V260.00Q96.15,260.00 96.15,260.00H104.38Q104.38,260.00 104.38,260.00V260.00Z"><title>25 heads: 0.00%</title></path>
+<path class="bar out" d="M106.38,260.00V260.00Q106.38,260.00 106.38,260.00H114.61Q114.61,260.00 114.61,260.00V260.00Z"><title>26 heads: 0.00%</title></path>
+<path class="bar out" d="M116.61,260.00V260.00Q116.61,260.00 116.61,260.00H124.83Q124.84,260.00 124.84,260.00V260.00Z"><title>27 heads: 0.00%</title></path>
+<path class="bar out" d="M126.84,260.00V259.99Q126.84,259.99 126.84,259.99H135.06Q135.07,259.99 135.07,259.99V260.00Z"><title>28 heads: 0.00%</title></path>
+<path class="bar out" d="M137.07,260.00V259.99Q137.07,259.97 137.08,259.97H145.28Q145.30,259.97 145.30,259.99V260.00Z"><title>29 heads: 0.00%</title></path>
+<path class="bar out" d="M147.30,260.00V259.97Q147.30,259.93 147.33,259.93H155.49Q155.52,259.93 155.52,259.97V260.00Z"><title>30 heads: 0.00%</title></path>
+<path class="bar out" d="M157.52,260.00V259.92Q157.52,259.85 157.60,259.85H165.68Q165.75,259.85 165.75,259.92V260.00Z"><title>31 heads: 0.01%</title></path>
+<path class="bar out" d="M167.75,260.00V259.84Q167.75,259.67 167.92,259.67H175.82Q175.98,259.67 175.98,259.84V260.00Z"><title>32 heads: 0.01%</title></path>
+<path class="bar out" d="M177.98,260.00V259.66Q177.98,259.33 178.32,259.33H185.88Q186.21,259.33 186.21,259.66V260.00Z"><title>33 heads: 0.02%</title></path>
+<path class="bar out" d="M188.21,260.00V259.34Q188.21,258.67 188.88,258.67H195.78Q196.44,258.67 196.44,259.34V260.00Z"><title>34 heads: 0.05%</title></path>
+<path class="bar in" d="M198.44,260.00V258.75Q198.44,257.49 199.70,257.49H205.42Q206.67,257.49 206.67,258.75V260.00Z"><title>35 heads: 0.09%</title></path>
+<path class="bar in" d="M208.67,260.00V257.48Q208.67,255.48 210.67,255.48H214.90Q216.90,255.48 216.90,257.48V260.00Z"><title>36 heads: 0.16%</title></path>
+<path class="bar in" d="M218.90,260.00V254.18Q218.90,252.18 220.90,252.18H225.13Q227.13,252.18 227.13,254.18V260.00Z"><title>37 heads: 0.27%</title></path>
+<path class="bar in" d="M229.13,260.00V249.03Q229.13,247.03 231.13,247.03H235.36Q237.36,247.03 237.36,249.03V260.00Z"><title>38 heads: 0.45%</title></path>
+<path class="bar in" d="M239.36,260.00V241.38Q239.36,239.38 241.36,239.38H245.59Q247.59,239.38 247.59,241.38V260.00Z"><title>39 heads: 0.71%</title></path>
+<path class="bar in" d="M249.59,260.00V230.55Q249.59,228.55 251.59,228.55H255.82Q257.82,228.55 257.82,230.55V260.00Z"><title>40 heads: 1.08%</title></path>
+<path class="bar in" d="M259.82,260.00V215.98Q259.82,213.98 261.82,213.98H266.05Q268.05,213.98 268.05,215.98V260.00Z"><title>41 heads: 1.59%</title></path>
+<path class="bar in" d="M270.05,260.00V197.35Q270.05,195.35 272.05,195.35H276.28Q278.28,195.35 278.28,197.35V260.00Z"><title>42 heads: 2.23%</title></path>
+<path class="bar in" d="M280.28,260.00V174.80Q280.28,172.80 282.28,172.80H286.51Q288.51,172.80 288.51,174.80V260.00Z"><title>43 heads: 3.01%</title></path>
+<path class="bar in" d="M290.51,260.00V149.04Q290.51,147.04 292.51,147.04H296.74Q298.74,147.04 298.74,149.04V260.00Z"><title>44 heads: 3.90%</title></path>
+<path class="bar in" d="M300.74,260.00V121.42Q300.74,119.42 302.74,119.42H306.97Q308.97,119.42 308.97,121.42V260.00Z"><title>45 heads: 4.85%</title></path>
+<path class="bar in" d="M310.97,260.00V93.92Q310.97,91.92 312.97,91.92H317.20Q319.20,91.92 319.20,93.92V260.00Z"><title>46 heads: 5.80%</title></path>
+<path class="bar in" d="M321.20,260.00V68.89Q321.20,66.89 323.20,66.89H327.43Q329.43,66.89 329.43,68.89V260.00Z"><title>47 heads: 6.66%</title></path>
+<path class="bar in" d="M331.43,260.00V48.77Q331.43,46.77 333.43,46.77H337.66Q339.66,46.77 339.66,48.77V260.00Z"><title>48 heads: 7.35%</title></path>
+<path class="bar in" d="M341.66,260.00V35.72Q341.66,33.72 343.66,33.72H347.89Q349.89,33.72 349.89,35.72V260.00Z"><title>49 heads: 7.80%</title></path>
+<path class="bar in" d="M351.89,260.00V31.19Q351.89,29.19 353.89,29.19H358.11Q360.11,29.19 360.11,31.19V260.00Z"><title>50 heads: 7.96%</title></path>
+<path class="bar in" d="M362.11,260.00V35.72Q362.11,33.72 364.11,33.72H368.34Q370.34,33.72 370.34,35.72V260.00Z"><title>51 heads: 7.80%</title></path>
+<path class="bar in" d="M372.34,260.00V48.77Q372.34,46.77 374.34,46.77H378.57Q380.57,46.77 380.57,48.77V260.00Z"><title>52 heads: 7.35%</title></path>
+<path class="bar in" d="M382.57,260.00V68.89Q382.57,66.89 384.57,66.89H388.80Q390.80,66.89 390.80,68.89V260.00Z"><title>53 heads: 6.66%</title></path>
+<path class="bar in" d="M392.80,260.00V93.92Q392.80,91.92 394.80,91.92H399.03Q401.03,91.92 401.03,93.92V260.00Z"><title>54 heads: 5.80%</title></path>
+<path class="bar in" d="M403.03,260.00V121.42Q403.03,119.42 405.03,119.42H409.26Q411.26,119.42 411.26,121.42V260.00Z"><title>55 heads: 4.85%</title></path>
+<path class="bar in" d="M413.26,260.00V149.04Q413.26,147.04 415.26,147.04H419.49Q421.49,147.04 421.49,149.04V260.00Z"><title>56 heads: 3.90%</title></path>
+<path class="bar in" d="M423.49,260.00V174.80Q423.49,172.80 425.49,172.80H429.72Q431.72,172.80 431.72,174.80V260.00Z"><title>57 heads: 3.01%</title></path>
+<path class="bar in" d="M433.72,260.00V197.35Q433.72,195.35 435.72,195.35H439.95Q441.95,195.35 441.95,197.35V260.00Z"><title>58 heads: 2.23%</title></path>
+<path class="bar in" d="M443.95,260.00V215.98Q443.95,213.98 445.95,213.98H450.18Q452.18,213.98 452.18,215.98V260.00Z"><title>59 heads: 1.59%</title></path>
+<path class="bar in" d="M454.18,260.00V230.55Q454.18,228.55 456.18,228.55H460.41Q462.41,228.55 462.41,230.55V260.00Z"><title>60 heads: 1.08%</title></path>
+<path class="bar in" d="M464.41,260.00V241.38Q464.41,239.38 466.41,239.38H470.64Q472.64,239.38 472.64,241.38V260.00Z"><title>61 heads: 0.71%</title></path>
+<path class="bar in" d="M474.64,260.00V249.03Q474.64,247.03 476.64,247.03H480.87Q482.87,247.03 482.87,249.03V260.00Z"><title>62 heads: 0.45%</title></path>
+<path class="bar in" d="M484.87,260.00V254.18Q484.87,252.18 486.87,252.18H491.10Q493.10,252.18 493.10,254.18V260.00Z"><title>63 heads: 0.27%</title></path>
+<path class="bar in" d="M495.10,260.00V257.48Q495.10,255.48 497.10,255.48H501.33Q503.33,255.48 503.33,257.48V260.00Z"><title>64 heads: 0.16%</title></path>
+<path class="bar in" d="M505.33,260.00V258.75Q505.33,257.49 506.58,257.49H512.30Q513.56,257.49 513.56,258.75V260.00Z"><title>65 heads: 0.09%</title></path>
+<path class="bar out" d="M515.56,260.00V259.34Q515.56,258.67 516.22,258.67H523.12Q523.79,258.67 523.79,259.34V260.00Z"><title>66 heads: 0.05%</title></path>
+<path class="bar out" d="M525.79,260.00V259.66Q525.79,259.33 526.12,259.33H533.68Q534.02,259.33 534.02,259.66V260.00Z"><title>67 heads: 0.02%</title></path>
+<path class="bar out" d="M536.02,260.00V259.84Q536.02,259.67 536.18,259.67H544.08Q544.25,259.67 544.25,259.84V260.00Z"><title>68 heads: 0.01%</title></path>
+<path class="bar out" d="M546.25,260.00V259.92Q546.25,259.85 546.32,259.85H554.40Q554.48,259.85 554.48,259.92V260.00Z"><title>69 heads: 0.01%</title></path>
+<path class="bar out" d="M556.48,260.00V259.97Q556.48,259.93 556.51,259.93H564.67Q564.70,259.93 564.70,259.97V260.00Z"><title>70 heads: 0.00%</title></path>
+<path class="bar out" d="M566.70,260.00V259.99Q566.70,259.97 566.72,259.97H574.92Q574.93,259.97 574.93,259.99V260.00Z"><title>71 heads: 0.00%</title></path>
+<path class="bar out" d="M576.93,260.00V259.99Q576.93,259.99 576.94,259.99H585.16Q585.16,259.99 585.16,259.99V260.00Z"><title>72 heads: 0.00%</title></path>
+<path class="bar out" d="M587.16,260.00V260.00Q587.16,260.00 587.17,260.00H595.39Q595.39,260.00 595.39,260.00V260.00Z"><title>73 heads: 0.00%</title></path>
+<path class="bar out" d="M597.39,260.00V260.00Q597.39,260.00 597.39,260.00H605.62Q605.62,260.00 605.62,260.00V260.00Z"><title>74 heads: 0.00%</title></path>
+<path class="bar out" d="M607.62,260.00V260.00Q607.62,260.00 607.62,260.00H615.85Q615.85,260.00 615.85,260.00V260.00Z"><title>75 heads: 0.00%</title></path>
+<path class="bar out" d="M617.85,260.00V260.00Q617.85,260.00 617.85,260.00H626.08Q626.08,260.00 626.08,260.00V260.00Z"><title>76 heads: 0.00%</title></path>
+<path class="bar out" d="M628.08,260.00V260.00Q628.08,260.00 628.08,260.00H636.31Q636.31,260.00 636.31,260.00V260.00Z"><title>77 heads: 0.00%</title></path>
+<path class="bar out" d="M638.31,260.00V260.00Q638.31,260.00 638.31,260.00H646.54Q646.54,260.00 646.54,260.00V260.00Z"><title>78 heads: 0.00%</title></path>
+<path class="bar out" d="M648.54,260.00V260.00Q648.54,260.00 648.54,260.00H656.77Q656.77,260.00 656.77,260.00V260.00Z"><title>79 heads: 0.00%</title></path>
+<path class="bar out" d="M658.77,260.00V260.00Q658.77,260.00 658.77,260.00H667.00Q667.00,260.00 667.00,260.00V260.00Z"><title>80 heads: 0.00%</title></path>
+<line class="axis" x1="44" x2="668" y1="260" y2="260"/>
+<text class="tick" x="49.1" y="276" text-anchor="middle">20</text>
+<text class="tick" x="202.6" y="276" text-anchor="middle">35</text>
+<text class="tick" x="356.0" y="276" text-anchor="middle">50</text>
+<text class="tick" x="509.4" y="276" text-anchor="middle">65</text>
+<text class="tick" x="662.9" y="276" text-anchor="middle">80</text>
+<text class="axis-label" x="356.0" y="296" text-anchor="middle">Number of heads</text>
+<path class="bracket" fill="none" stroke="currentColor" d="M197.4,22V16H514.6V22"/>
+<text class="direct" x="356.0" y="12" text-anchor="middle">Typical set: 35–65 heads</text>
+</svg>
+<figcaption>Probability of each number of heads in 100 fair coin tosses.</figcaption>
+</figure>
 <p>This potentially makes transformers vulnerable to adversarial inputs. But it also tells us how we should be approaching formal proofs. We should not necessarily expect transformers to learn algorithms that work on every input, but instead for them to learn algorithms which work on the "typical set" of inputs, like "the set of inputs with between 35 and 65 heads". </p>
 <p>Then we can bound transformer performance in two stages:</p>
 <p>1.) Identify a "typical set" of inputs, where we can show the transformer gets high accuracy</p>
