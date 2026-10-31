@@ -22,7 +22,7 @@
 <h3>Ping-pong trick for \(z=1\)</h3>
 <figure class="widget-fig pingpong" id="pp">
 <style>
-#pp .pp-panel { background: #fff; border-radius: 4px; padding: 6px; }
+#pp .pp-panel { background: #fff; border-radius: 4px; padding: 6px; max-width: 100%; overflow: hidden; box-sizing: border-box; }
 #pp rect.pp-on { fill: #111; stroke: #999; stroke-width: 0.5; }
 #pp rect.pp-off { fill: #fff; stroke: #bbb; stroke-width: 0.5; }
 #pp rect.pp-block { fill: none; stroke: #d6245a; stroke-width: 2; }
@@ -41,7 +41,7 @@
   <label>\(j\) <select class="pp-j"><option value="0">1</option><option value="1">2</option><option value="2">3</option><option value="3" selected>4</option></select></label>
 </div>
 <div class="pp-panel">
-<svg class="pp-svg" viewBox="0 0 680 335" style="overflow:visible" role="img" aria-label="Animated ping-pong computation: activity bounces between memory blocks i and j across layers">
+<svg class="pp-svg" viewBox="0 0 680 335" width="100%" preserveAspectRatio="xMidYMid meet" style="display:block;width:100%;max-width:100%;height:auto" role="img" aria-label="Animated ping-pong computation: activity bounces between memory blocks i and j across layers">
   <g class="pp-arrows"></g>
   <g class="pp-blocks"></g>
   <g class="pp-labels"></g>
@@ -55,7 +55,7 @@
   var gA = fig.querySelector(".pp-arrows"), gB = fig.querySelector(".pp-blocks"), gL = fig.querySelector(".pp-labels");
   var NS = "http://www.w3.org/2000/svg";
   var NB = 4, SIDE = 4, CELL = 13, BH = SIDE * CELL, NL = 4;
-  var X0 = 70, DX = 170, Y0 = 34, GAP = 8;
+  var X0 = 84, DX = 160, Y0 = 34, GAP = 8;
   var OH_Y = Y0 + NB * (BH + GAP) + 18;
   var stage = 0, timer = null, iB = 1, jB = 3, pats = [];
   function el(name, attrs, parent) {
