@@ -20,7 +20,139 @@
 <p>This post builds on <em>Circuits in Superposition 2</em>, using the same terminology.</p>
 <p>I focus on the \(z=1\) case, meaning that exactly one circuit is active on each forward pass. This restriction simplifies the setting substantially and allows a construction with <strong>zero error,</strong> with \(T = \frac{D^2}{d^2}\) <strong>,</strong> \(L+2\) layers, and width \(D(1+\frac{1}{d} + \frac{\lceil\text{log}_2{\frac{D}{d}}\rceil}{D})\). While the construction does not directly generalise to larger \(z\), the strategy for mitigating error should still be relevant. I think the ideas behind the construction could be useful for larger \(z\), and the construction itself is quite neat.</p>
 <h3>Ping-pong trick for \(z=1\)</h3>
-<p><img loading="lazy" alt="" src="../images/7df1717cf98a4244.png" /></p>
+<figure class="widget-fig pingpong" id="pp">
+<div class="pp-controls">
+  <button type="button" class="pp-play">Play</button>
+  <button type="button" class="pp-step">Step</button>
+  <button type="button" class="pp-reset">Reset</button>
+  <label>\(i\) <select class="pp-i"><option value="0">1</option><option value="1" selected>2</option><option value="2">3</option><option value="3">4</option></select></label>
+  <label>\(j\) <select class="pp-j"><option value="0">1</option><option value="1">2</option><option value="2">3</option><option value="3" selected>4</option></select></label>
+</div>
+<div class="pp-panel">
+<svg class="pp-svg" viewBox="0 0 680 335" role="img" aria-label="Animated ping-pong computation: activity bounces between memory blocks i and j across layers">
+  <g class="pp-arrows"></g>
+  <g class="pp-blocks"></g>
+  <g class="pp-labels"></g>
+</svg>
+</div>
+<p class="pp-status" aria-live="polite"></p>
+<script>
+(function () {
+  var fig = document.getElementById("pp");
+  var svg = fig.querySelector(".pp-svg");
+  var gA = fig.querySelector(".pp-arrows"), gB = fig.querySelector(".pp-blocks"), gL = fig.querySelector(".pp-labels");
+  var NS = "http://www.w3.org/2000/svg";
+  var NB = 4, SIDE = 4, CELL = 13, BH = SIDE * CELL, NL = 4;
+  var X0 = 70, DX = 170, Y0 = 34, GAP = 8;
+  var OH_Y = Y0 + NB * (BH + GAP) + 18;
+  var stage = 0, timer = null, iB = 1, jB = 3, pats = [];
+  function el(name, attrs, parent) {
+    var e = document.createElementNS(NS, name);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function rand(seed) { var s = seed; return function () { s = (s * 16807) % 2147483647; return s / 2147483647; }; }
+  function newPatterns() {
+    var r = rand(7 + iB * 31 + jB * 17);
+    pats = [];
+    for (var l = 0; l < NL; l++) {
+      var layer = [];
+      for (var b = 0; b < NB; b++) {
+        var p = [];
+        for (var c = 0; c < SIDE * SIDE; c++) p.push(r() < 0.3);
+        layer.push(p);
+      }
+      pats.push(layer);
+    }
+  }
+  function src(l) { return l % 2 === 1 ? iB : jB; }       // block feeding layer l (l >= 1)
+  function dst(l) { return l % 2 === 1 ? jB : iB; }       // block that survives in layer l
+  function blockX(l) { return X0 + l * DX; }
+  function blockY(b) { return Y0 + b * (BH + GAP); }
+  // stages: 0 = input loaded; for each transition t (1..3): 3 sub-stages
+  var MAX = 1 + (NL - 1) * 3;
+  function state() {
+    if (stage === 0) return { layer: 0, sub: 3 };
+    var t = Math.ceil(stage / 3), sub = stage - (t - 1) * 3; // sub 1 broadcast, 2 bias, 3 suppress
+    return { layer: t, sub: sub };
+  }
+  function draw() {
+    while (gA.firstChild) gA.removeChild(gA.firstChild);
+    while (gB.firstChild) gB.removeChild(gB.firstChild);
+    while (gL.firstChild) gL.removeChild(gL.firstChild);
+    var s = state();
+    for (var l = 0; l < NL; l++) {
+      el("text", { x: blockX(l) + BH / 2, y: Y0 - 12, "text-anchor": "middle", "class": "pp-txt" }, gL).textContent = l === 0 ? "input" : "layer " + l;
+      for (var b = 0; b < NB; b++) {
+        var x = blockX(l), y = blockY(b);
+        var shown = false, faded = false;
+        if (l === 0) shown = (b === iB);
+        else if (l < s.layer) shown = (b === dst(l));
+        else if (l === s.layer) {
+          if (s.sub < 3) shown = true;
+          else shown = (b === dst(l));
+          faded = s.sub === 3 && b !== dst(l);
+        }
+        for (var c = 0; c < SIDE * SIDE; c++) {
+          var on = shown && (l === 0 ? pats[0][b][c] || c % 5 === 0 : pats[l][b][c]);
+          el("rect", { x: x + (c % SIDE) * CELL, y: y + Math.floor(c / SIDE) * CELL, width: CELL, height: CELL, "class": on ? "pp-on" : "pp-off" }, gB);
+        }
+        el("rect", { x: x, y: y, width: BH, height: BH, "class": "pp-block" + (faded ? " pp-killed" : "") }, gB);
+        if (faded) {
+          el("text", { x: x + BH + 4, y: y + BH / 2 + 4, "class": "pp-txt pp-small" }, gL).textContent = "−∞";
+        }
+        if (l === 0) el("text", { x: x - 8, y: y + BH / 2 + 4, "text-anchor": "end", "class": "pp-txt pp-small" }, gL).textContent = "block " + (b + 1);
+      }
+      // one-hot encodings of i and j under each column
+      for (var r = 0; r < 2; r++) {
+        var which = r === 0 ? iB : jB;
+        for (var k = 0; k < NB; k++) {
+          el("rect", { x: blockX(l) + k * CELL, y: OH_Y + r * (CELL + 6), width: CELL, height: CELL, "class": k === which ? "pp-on" : "pp-off" }, gB);
+        }
+        el("rect", { x: blockX(l), y: OH_Y + r * (CELL + 6), width: NB * CELL, height: CELL, "class": "pp-oh" }, gB);
+        if (l === 0) el("text", { x: blockX(0) - 8, y: OH_Y + r * (CELL + 6) + 9, "text-anchor": "end", "class": "pp-txt pp-small" }, gL).textContent = r === 0 ? "one-hot i" : "one-hot j";
+      }
+    }
+    // arrows for the current transition
+    if (stage > 0) {
+      var L = s.layer, a = src(L), x1 = blockX(L - 1) + BH, y1 = blockY(a) + BH / 2;
+      for (var b2 = 0; b2 < NB; b2++) {
+        var y2 = blockY(b2) + BH / 2, keep = b2 === dst(L);
+        if (s.sub >= 1 && !(s.sub === 3 && !keep)) el("line", { x1: x1 + 2, y1: y1, x2: blockX(L) - 4, y2: y2, "class": "pp-arrow" }, gA);
+        if (s.sub >= 2 && !(s.sub === 3 && !keep)) {
+          var ohRow = (L % 2 === 1) ? 0 : 1; // bias comes from the source block's one-hot
+          el("line", { x1: blockX(L - 1) + a * CELL + CELL / 2, y1: OH_Y + ohRow * (CELL + 6), x2: blockX(L) - 4, y2: y2 + 6, "class": "pp-bias" }, gA);
+        }
+      }
+    }
+    var msg;
+    if (stage === 0) msg = "The input x is loaded into block i = " + (iB + 1) + ".";
+    else {
+      var nm = ["", "Weights from the active block reach every block of layer " + s.layer + ".",
+                "One-hot of block " + (src(s.layer) + 1) + " sets the bias for layer " + s.layer + " (green).",
+                "One-hot of block " + (dst(s.layer) + 1) + " adds a massive negative bias everywhere except block " + (dst(s.layer) + 1) + ", so only it stays active."];
+      msg = nm[s.sub];
+    }
+    fig.querySelector(".pp-status").textContent = msg;
+  }
+  function step() { stage = stage >= MAX ? 0 : stage + 1; draw(); }
+  function stop() { if (timer) { clearInterval(timer); timer = null; } fig.querySelector(".pp-play").textContent = "Play"; }
+  fig.querySelector(".pp-play").onclick = function () {
+    if (timer) { stop(); return; }
+    this.textContent = "Pause";
+    timer = setInterval(function () { if (stage >= MAX) { stop(); return; } step(); }, 1100);
+  };
+  fig.querySelector(".pp-step").onclick = function () { stop(); step(); };
+  fig.querySelector(".pp-reset").onclick = function () { stop(); stage = 0; draw(); };
+  fig.querySelector(".pp-i").onchange = function () { stop(); iB = +this.value; stage = 0; newPatterns(); draw(); };
+  fig.querySelector(".pp-j").onchange = function () { stop(); jB = +this.value; stage = 0; newPatterns(); draw(); };
+  newPatterns(); draw();
+})();
+</script>
+<noscript><img src="../images/7df1717cf98a4244.png" alt="Ping-pong diagram"></noscript>
+</figure>
+
 <p>A circuit is specified by an ordered pair of memory blocks (the red squares). There are \(\frac{D}{d}\)memory blocks, so \(\frac{D^2}{d^2}\) circuits can be coded for. The circuit is computed by "bouncing" between these two memory blocks. White squares represent neurons with no activation, and black squares represent neurons with any amount of activation. Green-dashed arrows represent the bias specific to block \(i\). Here \(D=64\), \(d=16\).</p>
 <p>This is basically the same trick as <a href="https://embedded.fm/blog/2017/3/21/ping-pong-buffers">ping-pong buffers</a>.</p>
 <p>We divide the layer width \(D\) into \(\frac{D}{d}\) contiguous memory blocks of size \(d\).</p>

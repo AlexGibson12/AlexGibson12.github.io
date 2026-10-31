@@ -45,6 +45,81 @@
 <p>Then setting \(C_{g(\frac{i}{n})}\) proportional to \(\frac{1}{||f'(s_{g(\frac{i}{n})})||^2_2}\), we get an output proportional to \((j-i)v\)</p>
 <h2>Extensions of mechanism</h2>
 <p>The above mechanism is clean, and captures the key ideas. A nice thing about the mechanism is that the \(f(s_m) \cdot x_i\) term can be noisy, but it doesn't matter because the common noise will get cancelled out, similar to twisted pair encoding. </p>
+<figure class="widget-fig twisted" id="tp">
+<div class="tp-controls">
+  <label>Signal \(\sigma\) <input type="range" class="tp-sig" min="-1" max="1" step="0.01" value="0.5"><output class="tp-sig-o"></output></label>
+  <label>Gate \(a\) <input type="range" class="tp-gate" min="-2" max="3" step="0.01" value="1.6"><output class="tp-gate-o"></output></label>
+  <button type="button" class="tp-noise">Jitter gate</button>
+</div>
+<svg class="tp-svg" viewBox="0 0 680 300" role="img" aria-label="Neuron pair outputs as the shared gate term varies; the difference stays at twice the signal while the gate exceeds the signal's magnitude">
+  <g class="tp-plot"></g>
+  <g class="tp-bars"></g>
+</svg>
+<p class="tp-status" aria-live="polite"></p>
+<script>
+(function () {
+  var fig = document.getElementById("tp");
+  var NS = "http://www.w3.org/2000/svg";
+  var gP = fig.querySelector(".tp-plot"), gB = fig.querySelector(".tp-bars");
+  var sigIn = fig.querySelector(".tp-sig"), gateIn = fig.querySelector(".tp-gate");
+  var PX = 60, PW = 330, PY = 30, PH = 220, AMIN = -2, AMAX = 3, YMIN = -2.2, YMAX = 2.2;
+  function el(n, a, p) { var e = document.createElementNS(NS, n); for (var k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; }
+  function relu(v) { return v > 0 ? v : 0; }
+  function sx(a) { return PX + (a - AMIN) / (AMAX - AMIN) * PW; }
+  function sy(v) { return PY + (YMAX - v) / (YMAX - YMIN) * PH; }
+  function fmt(v) { return (v >= 0 ? "" : "−") + Math.abs(v).toFixed(2); }
+  function draw() {
+    var s = +sigIn.value, a = +gateIn.value;
+    fig.querySelector(".tp-sig-o").textContent = fmt(s);
+    fig.querySelector(".tp-gate-o").textContent = fmt(a);
+    while (gP.firstChild) gP.removeChild(gP.firstChild);
+    while (gB.firstChild) gB.removeChild(gB.firstChild);
+    el("rect", { x: sx(Math.abs(s)), y: PY, width: sx(AMAX) - sx(Math.abs(s)), height: PH, "class": "tp-exact" }, gP);
+    [-2, -1, 0, 1, 2].forEach(function (t) {
+      el("line", { x1: PX, x2: PX + PW, y1: sy(t), y2: sy(t), "class": t === 0 ? "tp-axis" : "tp-grid" }, gP);
+      el("text", { x: PX - 8, y: sy(t) + 4, "text-anchor": "end", "class": "tp-tick" }, gP).textContent = t < 0 ? "−" + (-t) : String(t);
+    });
+    [-2, -1, 0, 1, 2, 3].forEach(function (t) {
+      el("text", { x: sx(t), y: PY + PH + 16, "text-anchor": "middle", "class": "tp-tick" }, gP).textContent = t < 0 ? "−" + (-t) : String(t);
+    });
+    el("text", { x: PX + PW / 2, y: PY + PH + 34, "text-anchor": "middle", "class": "tp-tick" }, gP).textContent = "gate a";
+    var d = "";
+    for (var i = 0; i <= 200; i++) {
+      var av = AMIN + (AMAX - AMIN) * i / 200, v = relu(av + s) - relu(av - s);
+      d += (i ? "L" : "M") + sx(av).toFixed(1) + "," + sy(v).toFixed(1);
+    }
+    el("path", { d: d, "class": "tp-curve" }, gP);
+    el("text", { x: PX + PW - 4, y: sy(2 * s) + (s >= 0 ? -12 : 20), "text-anchor": "end", "class": "tp-label" }, gP).textContent = "difference = 2σ";
+    var diff = relu(a + s) - relu(a - s);
+    el("line", { x1: sx(a), x2: sx(a), y1: PY, y2: PY + PH, "class": "tp-cursor" }, gP);
+    el("circle", { cx: sx(a), cy: sy(diff), r: 5, "class": "tp-dot" }, gP);
+    var BX = 440, BW = 220, scale = (BW / 2 - 40) / 4;
+    var rows = [["Neuron⁺ = ReLU(a + σ)", relu(a + s)], ["Neuron⁻ = ReLU(a − σ)", relu(a - s)], ["Neuron⁺ − Neuron⁻", diff]];
+    rows.forEach(function (r, k) {
+      var y = PY + 20 + k * 74, w = Math.min(Math.abs(r[1]) * scale, BW / 2);
+      el("text", { x: BX, y: y, "class": "tp-tick" }, gB).textContent = r[0];
+      el("line", { x1: BX + BW / 2, x2: BX + BW / 2, y1: y + 8, y2: y + 34, "class": "tp-axis" }, gB);
+      var x0 = r[1] >= 0 ? BX + BW / 2 : BX + BW / 2 - w;
+      el("rect", { x: x0, y: y + 12, width: Math.max(w, 0.5), height: 18, rx: 3, "class": k === 2 ? "tp-bar-diff" : "tp-bar" }, gB);
+      el("text", { x: r[1] >= 0 ? BX + BW / 2 + w + 6 : BX + BW / 2 - w - 6, y: y + 26, "text-anchor": r[1] >= 0 ? "start" : "end", "class": "tp-label" }, gB).textContent = fmt(r[1]);
+    });
+    var msg;
+    if (a >= Math.abs(s)) msg = "Gate a ≥ |σ|: both neurons fire, and the shared gate (and any noise in it) cancels, so the difference is exactly 2σ.";
+    else if (a <= -Math.abs(s)) msg = "Gate a ≤ −|σ|: both neurons are off, so this sentry contributes nothing.";
+    else msg = "|a| < |σ|: only one neuron fires, so the gate no longer cancels. This is the transition region between sentries.";
+    fig.querySelector(".tp-status").textContent = msg;
+  }
+  sigIn.oninput = draw; gateIn.oninput = draw;
+  fig.querySelector(".tp-noise").onclick = function () {
+    var v = +gateIn.value + (Math.random() - 0.5) * 0.8;
+    gateIn.value = Math.max(-2, Math.min(3, v)); draw();
+  };
+  draw();
+})();
+</script>
+<figcaption>One sentry's neuron pair, with gate \(a = b_{m,1}f(s_m)\cdot x_i + b_{m,2}\) and signal \(\sigma = b_{m,3}(x_j-x_i)\cdot f'(s_m)\). Drag the sliders or jitter the gate.</figcaption>
+</figure>
+
 <p>However, there can still be potential issues caused by noise at the transitions between sentries. It is also not robust to \(f\) intersecting itself, and the number of sentries required grows with \(n\). </p>
 <p>There are cases where this kind of two neuron interference cancellation could come in useful outside of computing distance. For example, if you want to distinguish between British and Canadian English, you could have:</p>
 <p>\(\text{Neuron}_{\text{canada}} = \text{ReLU}(\text{Commonwealth} + \epsilon(\text{Canadian}) )\)</p>
