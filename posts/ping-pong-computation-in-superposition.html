@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ping pong computation in superposition · Alex Gibson</title>
-<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="../style.css?v=3">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
@@ -21,6 +21,18 @@
 <p>I focus on the \(z=1\) case, meaning that exactly one circuit is active on each forward pass. This restriction simplifies the setting substantially and allows a construction with <strong>zero error,</strong> with \(T = \frac{D^2}{d^2}\) <strong>,</strong> \(L+2\) layers, and width \(D(1+\frac{1}{d} + \frac{\lceil\text{log}_2{\frac{D}{d}}\rceil}{D})\). While the construction does not directly generalise to larger \(z\), the strategy for mitigating error should still be relevant. I think the ideas behind the construction could be useful for larger \(z\), and the construction itself is quite neat.</p>
 <h3>Ping-pong trick for \(z=1\)</h3>
 <figure class="widget-fig pingpong" id="pp">
+<style>
+#pp .pp-panel { background: #fff; border-radius: 4px; padding: 6px; }
+#pp rect.pp-on { fill: #111; stroke: #999; stroke-width: 0.5; }
+#pp rect.pp-off { fill: #fff; stroke: #bbb; stroke-width: 0.5; }
+#pp rect.pp-block { fill: none; stroke: #d6245a; stroke-width: 2; }
+#pp rect.pp-killed { stroke-dasharray: 4 3; opacity: 0.5; }
+#pp rect.pp-oh { fill: none; stroke: #111; stroke-width: 1.2; }
+#pp line.pp-arrow { stroke: #111; stroke-width: 1.4; }
+#pp line.pp-bias { stroke: #2fbf4a; stroke-width: 1.4; stroke-dasharray: 5 4; }
+#pp text.pp-txt { fill: #333; font-size: 12px; }
+#pp text.pp-small { font-size: 11px; fill: #666; }
+</style>
 <div class="pp-controls">
   <button type="button" class="pp-play">Play</button>
   <button type="button" class="pp-step">Step</button>
@@ -29,7 +41,7 @@
   <label>\(j\) <select class="pp-j"><option value="0">1</option><option value="1">2</option><option value="2">3</option><option value="3" selected>4</option></select></label>
 </div>
 <div class="pp-panel">
-<svg class="pp-svg" viewBox="0 0 680 335" role="img" aria-label="Animated ping-pong computation: activity bounces between memory blocks i and j across layers">
+<svg class="pp-svg" viewBox="0 0 680 335" style="overflow:visible" role="img" aria-label="Animated ping-pong computation: activity bounces between memory blocks i and j across layers">
   <g class="pp-arrows"></g>
   <g class="pp-blocks"></g>
   <g class="pp-labels"></g>
@@ -96,9 +108,9 @@
         }
         for (var c = 0; c < SIDE * SIDE; c++) {
           var on = shown && (l === 0 ? pats[0][b][c] || c % 5 === 0 : pats[l][b][c]);
-          el("rect", { x: x + (c % SIDE) * CELL, y: y + Math.floor(c / SIDE) * CELL, width: CELL, height: CELL, "class": on ? "pp-on" : "pp-off" }, gB);
+          el("rect", { x: x + (c % SIDE) * CELL, y: y + Math.floor(c / SIDE) * CELL, width: CELL, height: CELL, "class": on ? "pp-on" : "pp-off", fill: on ? "#111" : "#fff", stroke: "#bbb", "stroke-width": 0.5 }, gB);
         }
-        el("rect", { x: x, y: y, width: BH, height: BH, "class": "pp-block" + (faded ? " pp-killed" : "") }, gB);
+        el("rect", { x: x, y: y, width: BH, height: BH, "class": "pp-block" + (faded ? " pp-killed" : ""), fill: "none", stroke: "#d6245a", "stroke-width": 2 }, gB);
         if (faded) {
           el("text", { x: x + BH + 4, y: y + BH / 2 + 4, "class": "pp-txt pp-small" }, gL).textContent = "−∞";
         }
@@ -108,9 +120,9 @@
       for (var r = 0; r < 2; r++) {
         var which = r === 0 ? iB : jB;
         for (var k = 0; k < NB; k++) {
-          el("rect", { x: blockX(l) + k * CELL, y: OH_Y + r * (CELL + 6), width: CELL, height: CELL, "class": k === which ? "pp-on" : "pp-off" }, gB);
+          el("rect", { x: blockX(l) + k * CELL, y: OH_Y + r * (CELL + 6), width: CELL, height: CELL, "class": k === which ? "pp-on" : "pp-off", fill: k === which ? "#111" : "#fff", stroke: "#bbb", "stroke-width": 0.5 }, gB);
         }
-        el("rect", { x: blockX(l), y: OH_Y + r * (CELL + 6), width: NB * CELL, height: CELL, "class": "pp-oh" }, gB);
+        el("rect", { x: blockX(l), y: OH_Y + r * (CELL + 6), width: NB * CELL, height: CELL, "class": "pp-oh", fill: "none", stroke: "#111" }, gB);
         if (l === 0) el("text", { x: blockX(0) - 8, y: OH_Y + r * (CELL + 6) + 9, "text-anchor": "end", "class": "pp-txt pp-small" }, gL).textContent = r === 0 ? "one-hot i" : "one-hot j";
       }
     }
@@ -119,10 +131,10 @@
       var L = s.layer, a = src(L), x1 = blockX(L - 1) + BH, y1 = blockY(a) + BH / 2;
       for (var b2 = 0; b2 < NB; b2++) {
         var y2 = blockY(b2) + BH / 2, keep = b2 === dst(L);
-        if (s.sub >= 1 && !(s.sub === 3 && !keep)) el("line", { x1: x1 + 2, y1: y1, x2: blockX(L) - 4, y2: y2, "class": "pp-arrow" }, gA);
+        if (s.sub >= 1 && !(s.sub === 3 && !keep)) el("line", { x1: x1 + 2, y1: y1, x2: blockX(L) - 4, y2: y2, "class": "pp-arrow", stroke: "#111" }, gA);
         if (s.sub >= 2 && !(s.sub === 3 && !keep)) {
           var ohRow = (L % 2 === 1) ? 0 : 1; // bias comes from the source block's one-hot
-          el("line", { x1: blockX(L - 1) + a * CELL + CELL / 2, y1: OH_Y + ohRow * (CELL + 6), x2: blockX(L) - 4, y2: y2 + 6, "class": "pp-bias" }, gA);
+          el("line", { x1: blockX(L - 1) + a * CELL + CELL / 2, y1: OH_Y + ohRow * (CELL + 6), x2: blockX(L) - 4, y2: y2 + 6, "class": "pp-bias", stroke: "#2fbf4a", "stroke-dasharray": "5 4" }, gA);
         }
       }
     }
