@@ -83,7 +83,7 @@
   function blockX(l) { return X0 + l * DX; }
   function blockY(b) { return Y0 + b * (BH + GAP); }
   // stages: 0 = input loaded; for each transition t (1..3): 3 sub-stages
-  var MAX = 1 + (NL - 1) * 3;
+  var MAX = (NL - 1) * 3;
   function state() {
     if (stage === 0) return { layer: 0, sub: 3 };
     var t = Math.ceil(stage / 3), sub = stage - (t - 1) * 3; // sub 1 broadcast, 2 bias, 3 suppress
